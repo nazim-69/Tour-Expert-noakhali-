@@ -1,0 +1,241 @@
+{
+  "entities": {
+    "Event": {
+      "title": "TourEvent",
+      "description": "A scheduled tour event organized by ট্যুর এক্সপার্ট নোয়াখালী with vehicle-specific seat plan.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "destination": { "type": "string" },
+        "tourDate": { "type": "string" },
+        "monthTag": { "type": "string", "enum": ["THIS_MONTH", "NEXT_MONTH", "UPCOMING"] },
+        "category": { "type": "string", "enum": ["HILL", "SEA", "BUDGET", "FAMILY", "STUDY", "CORPORATE", "FOREST"] },
+        "duration": { "type": "string" },
+        "price": { "type": "integer" },
+        "advancePayment": { "type": "integer" },
+        "shortDescription": { "type": "string" },
+        "description": { "type": "string" },
+        "imageKey": { "type": "string" },
+        "customImageUri": { "type": "string" },
+        "galleryKeys": { "type": "array" },
+        "totalSeats": { "type": "integer" },
+        "bookedSeats": { "type": "array" },
+        "holdSeats": { "type": "array" },
+        "vehicleLayout": { "type": "string", "enum": ["COACH_40", "MINIBUS_28", "HIACE_12", "SHIP_CABIN_32"] },
+        "bookingStatus": { "type": "string", "enum": ["OPEN", "ALMOST_FULL", "CLOSED", "COMPLETED"] },
+        "featured": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" }
+      },
+      "required": ["name", "destination", "tourDate", "monthTag", "category", "duration", "price", "advancePayment", "shortDescription", "description", "imageKey", "galleryKeys", "totalSeats", "bookedSeats", "holdSeats", "vehicleLayout", "bookingStatus", "featured", "createdAt", "updatedAt"]
+    },
+    "Destination": {
+      "title": "Destination",
+      "description": "Popular Bangladesh tourist destination showcase.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "division": { "type": "string" },
+        "shortDescription": { "type": "string" },
+        "fullDetails": { "type": "string" },
+        "bestTime": { "type": "string" },
+        "imageKey": { "type": "string" },
+        "relatedEventIds": { "type": "array" },
+        "sortOrder": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "division", "shortDescription", "fullDetails", "bestTime", "imageKey", "relatedEventIds", "sortOrder", "createdAt", "updatedAt"]
+    },
+    "TeamMember": {
+      "title": "TeamMember",
+      "description": "Public showcase profile for the 08 official admins. Private contact fields stay hidden unless Super Admin enables showPublicContact.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "designation": { "type": "string" },
+        "sortOrder": { "type": "integer" },
+        "showPublicContact": { "type": "boolean" },
+        "publicPhone": { "type": "string" },
+        "whatsappUrl": { "type": "string" },
+        "facebookUrl": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "designation", "sortOrder", "showPublicContact", "updatedAt"]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Maps a Google Auth UID to trusted Firestore admin RBAC role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "adminAccountId": { "type": "string" },
+        "role": { "type": "string", "enum": ["SUPER_ADMIN", "ADMIN"] },
+        "displayName": { "type": "string" },
+        "canManageEvents": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "adminAccountId", "role", "displayName", "createdAt", "updatedAt"]
+    },
+    "AdminAccount": {
+      "title": "AdminAccount",
+      "description": "Individual admin account for the 08 official admins with PBKDF2 salted hash and granular RBAC permissions.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "designation": { "type": "string" },
+        "role": { "type": "string", "enum": ["SUPER_ADMIN", "ADMIN"] },
+        "passwordHash": { "type": "string" },
+        "passwordSalt": { "type": "string" },
+        "boundEmail": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsappUrl": { "type": "string" },
+        "facebookUrl": { "type": "string" },
+        "canManageEvents": { "type": "boolean" },
+        "canVerifyPayments": { "type": "boolean" },
+        "canManageBookings": { "type": "boolean" },
+        "canManageDestinations": { "type": "boolean" },
+        "canManageSettings": { "type": "boolean" },
+        "active": { "type": "boolean" },
+        "sortOrder": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "username", "designation", "role", "passwordHash", "passwordSalt", "canManageEvents", "canVerifyPayments", "canManageBookings", "canManageDestinations", "canManageSettings", "active", "sortOrder", "createdAt", "updatedAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Tourist event booking record with seat numbers, advance payment verification, and unique reference number.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "referenceNumber": { "type": "string" },
+        "eventId": { "type": "string" },
+        "eventName": { "type": "string" },
+        "destination": { "type": "string" },
+        "tourDate": { "type": "string" },
+        "touristName": { "type": "string" },
+        "touristEmail": { "type": "string", "description": "Tourist Gmail address for booking confirmation memo delivery." },
+        "mobileNumber": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "numberOfTourists": { "type": "integer" },
+        "nidOrPassport": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "address": { "type": "string" },
+        "boardingPoint": { "type": "string" },
+        "selectedSeats": { "type": "array" },
+        "totalAmount": { "type": "integer" },
+        "paidAmount": { "type": "integer" },
+        "paymentMethod": { "type": "string", "enum": ["বিকাশ", "নগদ", "রকেট", "উপায়"] },
+        "transactionId": { "type": "string" },
+        "paymentDate": { "type": "string" },
+        "paymentScreenshotUri": { "type": "string" },
+        "specialInstructions": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Payment Verification Pending", "Confirmed", "Cancelled", "Completed"] },
+        "confirmationMemoSent": { "type": "boolean" },
+        "memoSentAt": { "type": "string" },
+        "assignedAdminId": { "type": "string" },
+        "verifiedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "referenceNumber", "eventId", "eventName", "destination", "tourDate", "touristName", "touristEmail", "mobileNumber", "whatsappNumber", "numberOfTourists", "emergencyContact", "address", "selectedSeats", "totalAmount", "paidAmount", "paymentMethod", "transactionId", "paymentDate", "status", "createdAt", "updatedAt"]
+    },
+    "BookingStatusLookup": {
+      "title": "BookingStatusLookup",
+      "description": "Non-PII booking status tracker indexed by unique Reference Number.",
+      "type": "object",
+      "properties": {
+        "referenceNumber": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "userId": { "type": "string" },
+        "eventName": { "type": "string" },
+        "destination": { "type": "string" },
+        "tourDate": { "type": "string" },
+        "seatCount": { "type": "integer" },
+        "seatLabels": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Payment Verification Pending", "Confirmed", "Cancelled", "Completed"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["referenceNumber", "bookingId", "userId", "eventName", "destination", "tourDate", "seatCount", "seatLabels", "status", "updatedAt"]
+    },
+    "AgencySettings": {
+      "title": "AgencySettings",
+      "description": "Official agency configuration and sequential booking counter.",
+      "type": "object",
+      "properties": {
+        "organizationName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "address": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "bookingPhone": { "type": "string" },
+        "advancePaymentNumber": { "type": "string" },
+        "facebookUrl": { "type": "string" },
+        "whatsappUrl": { "type": "string" },
+        "websiteUrl": { "type": "string", "description": "Public shareable website/app URL." },
+        "welcomeBannerText": { "type": "string" },
+        "activeMonthTitle": { "type": "string" },
+        "bookingCounter": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["organizationName", "tagline", "address", "contactPhone", "bookingPhone", "advancePaymentNumber", "bookingCounter", "updatedAt"]
+    },
+    "TourReview": {
+      "title": "TourReview",
+      "description": "Tourist experience review and star rating (1-5) for ট্যুর এক্সপার্ট নোয়াখালী.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "reviewerName": { "type": "string" },
+        "eventId": { "type": "string" },
+        "eventName": { "type": "string" },
+        "rating": { "type": "integer" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "reviewerName", "eventName", "rating", "comment", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/Event" },
+      "description": "Monthly tour events and vehicle seat occupancy."
+    },
+    "/destinations/{destId}": {
+      "schema": { "$ref": "#/entities/Destination" },
+      "description": "Popular Bangladesh tourist destinations."
+    },
+    "/team_members/{memberId}": {
+      "schema": { "$ref": "#/entities/TeamMember" },
+      "description": "Public showcase cards for the 08 official admins."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminRole" },
+      "description": "Authorized admin UID role mappings."
+    },
+    "/admin_accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/AdminAccount" },
+      "description": "Individual admin credentials and granular RBAC permissions."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Tourist bookings with PII and payment verification."
+    },
+    "/booking_status_lookup/{referenceNumber}": {
+      "schema": { "$ref": "#/entities/BookingStatusLookup" },
+      "description": "Non-PII status lookup by reference number."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/AgencySettings" },
+      "description": "Agency settings document (agency)."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/TourReview" },
+      "description": "Verified tourist reviews and star ratings."
+    }
+  }
+}

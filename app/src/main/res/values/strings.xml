@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">ট্যুর এক্সপার্ট নোয়াখালী</string>
+    <string name="brand_tagline">ভ্রমণ যেখানে গল্প সেখানে</string>
+    <string name="brand_address">হাউজিং দক্ষিণ মোড়, নোয়াখালী</string>
+    <string name="brand_contact_phone">01822421919</string>
+    <string name="brand_advance_payment_number">01849958944</string>
+    <string name="welcome_greeting">স্বাগতম</string>
+    <string name="sign_in_with_google">Google দিয়ে সাইন-ইন করুন</string>
+</resources>

@@ -1,0 +1,6 @@
+{
+  "name": "ট্যুর এক্সপার্ট নোয়াখালী",
+  "description": "ভ্রমণ যেখানে গল্প সেখানে — ট্যুর এক্সপার্ট নোয়াখালী অফিসিয়াল ট্রাভেল ও ইভেন্ট বুকিং অ্যাপ।",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

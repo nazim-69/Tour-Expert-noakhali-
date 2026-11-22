@@ -1,0 +1,418 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isBootstrapAdmin() {
+      return isSignedIn() &&
+             request.auth.token.email_verified == true &&
+             request.auth.token.email == 'nazimmd74653@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() ||
+             (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isSuperAdmin() {
+      return isBootstrapAdmin() ||
+             (isSignedIn() &&
+              exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+              get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'SUPER_ADMIN');
+    }
+
+    function canAdminManageEvents() {
+      return isSuperAdmin() ||
+             (isSignedIn() &&
+              exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+              (!('canManageEvents' in get(/databases/$(database)/documents/admins/$(request.auth.uid)).data) ||
+               get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.canManageEvents == true));
+    }
+
+    // Entity Validators
+    function isValidEvent(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 140 &&
+             data.destination is string && data.destination.size() >= 1 && data.destination.size() <= 100 &&
+             data.tourDate is string && data.tourDate.size() >= 1 && data.tourDate.size() <= 60 &&
+             data.monthTag in ['THIS_MONTH', 'NEXT_MONTH', 'UPCOMING'] &&
+             data.category in ['HILL', 'SEA', 'BUDGET', 'FAMILY', 'STUDY', 'CORPORATE', 'FOREST'] &&
+             data.duration is string && data.duration.size() >= 1 && data.duration.size() <= 60 &&
+             data.price is int && data.price > 0 && data.price <= 500000 &&
+             data.advancePayment is int && data.advancePayment >= 0 && data.advancePayment <= data.price &&
+             data.shortDescription is string && data.shortDescription.size() >= 1 && data.shortDescription.size() <= 400 &&
+             data.description is string && data.description.size() >= 1 && data.description.size() <= 3000 &&
+             data.imageKey is string && data.imageKey.size() >= 1 && data.imageKey.size() <= 64 &&
+             (!('customImageUri' in data) || data.customImageUri == null || (data.customImageUri is string && data.customImageUri.size() <= 500)) &&
+             data.galleryKeys is list && data.galleryKeys.size() <= 10 && (data.galleryKeys.size() == 0 || data.galleryKeys[0] is string) &&
+             data.totalSeats is int && data.totalSeats >= 4 && data.totalSeats <= 60 &&
+             data.bookedSeats is list && data.bookedSeats.size() <= 60 && (data.bookedSeats.size() == 0 || data.bookedSeats[0] is string) &&
+             data.holdSeats is list && data.holdSeats.size() <= 60 && (data.holdSeats.size() == 0 || data.holdSeats[0] is string) &&
+             data.vehicleLayout in ['COACH_40', 'MINIBUS_28', 'HIACE_12', 'SHIP_CABIN_32'] &&
+             data.bookingStatus in ['OPEN', 'ALMOST_FULL', 'CLOSED', 'COMPLETED'] &&
+             data.featured is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidDestination(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.division is string && data.division.size() >= 1 && data.division.size() <= 80 &&
+             data.shortDescription is string && data.shortDescription.size() >= 1 && data.shortDescription.size() <= 400 &&
+             data.fullDetails is string && data.fullDetails.size() >= 1 && data.fullDetails.size() <= 3000 &&
+             data.bestTime is string && data.bestTime.size() >= 1 && data.bestTime.size() <= 120 &&
+             data.imageKey is string && data.imageKey.size() >= 1 && data.imageKey.size() <= 64 &&
+             data.relatedEventIds is list && data.relatedEventIds.size() <= 10 && (data.relatedEventIds.size() == 0 || data.relatedEventIds[0] is string) &&
+             data.sortOrder is int && data.sortOrder >= 0 && data.sortOrder <= 1000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidTeamMember(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.designation is string && data.designation.size() >= 1 && data.designation.size() <= 120 &&
+             data.sortOrder is int && data.sortOrder >= 1 && data.sortOrder <= 50 &&
+             data.showPublicContact is bool &&
+             (!('publicPhone' in data) || data.publicPhone == null || (data.publicPhone is string && data.publicPhone.size() <= 30)) &&
+             (!('whatsappUrl' in data) || data.whatsappUrl == null || (data.whatsappUrl is string && data.whatsappUrl.size() <= 300)) &&
+             (!('facebookUrl' in data) || data.facebookUrl == null || (data.facebookUrl is string && data.facebookUrl.size() <= 300)) &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidAdminRole(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 160 &&
+             data.adminAccountId is string && data.adminAccountId.size() >= 1 && data.adminAccountId.size() <= 64 &&
+             data.role in ['SUPER_ADMIN', 'ADMIN'] &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             (!('canManageEvents' in data) || data.canManageEvents is bool) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidAdminAccount(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.username is string && data.username.size() >= 2 && data.username.size() <= 60 &&
+             data.designation is string && data.designation.size() >= 1 && data.designation.size() <= 120 &&
+             data.role in ['SUPER_ADMIN', 'ADMIN'] &&
+             data.passwordHash is string && data.passwordHash.size() >= 16 && data.passwordHash.size() <= 256 &&
+             data.passwordSalt is string && data.passwordSalt.size() >= 8 && data.passwordSalt.size() <= 128 &&
+             (!('boundEmail' in data) || data.boundEmail == null || (data.boundEmail is string && data.boundEmail.size() <= 160)) &&
+             (!('phone' in data) || data.phone == null || (data.phone is string && data.phone.size() <= 30)) &&
+             (!('whatsappUrl' in data) || data.whatsappUrl == null || (data.whatsappUrl is string && data.whatsappUrl.size() <= 300)) &&
+             (!('facebookUrl' in data) || data.facebookUrl == null || (data.facebookUrl is string && data.facebookUrl.size() <= 300)) &&
+             data.canManageEvents is bool &&
+             data.canVerifyPayments is bool &&
+             data.canManageBookings is bool &&
+             data.canManageDestinations is bool &&
+             data.canManageSettings is bool &&
+             data.active is bool &&
+             data.sortOrder is int && data.sortOrder >= 1 && data.sortOrder <= 50 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidBooking(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.referenceNumber is string && data.referenceNumber.size() >= 6 && data.referenceNumber.size() <= 40 &&
+             data.eventId is string && isValidId(data.eventId) &&
+             data.eventName is string && data.eventName.size() >= 1 && data.eventName.size() <= 140 &&
+             data.destination is string && data.destination.size() >= 1 && data.destination.size() <= 100 &&
+             data.tourDate is string && data.tourDate.size() >= 1 && data.tourDate.size() <= 60 &&
+             data.touristName is string && data.touristName.size() >= 2 && data.touristName.size() <= 100 &&
+             (!('touristEmail' in data) || (data.touristEmail is string && data.touristEmail.size() >= 5 && data.touristEmail.size() <= 160 && data.touristEmail.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'))) &&
+             data.mobileNumber is string && data.mobileNumber.size() >= 6 && data.mobileNumber.size() <= 20 &&
+             data.whatsappNumber is string && data.whatsappNumber.size() >= 6 && data.whatsappNumber.size() <= 20 &&
+             data.numberOfTourists is int && data.numberOfTourists >= 1 && data.numberOfTourists <= 20 &&
+             (!('nidOrPassport' in data) || data.nidOrPassport == null || (data.nidOrPassport is string && data.nidOrPassport.size() <= 40)) &&
+             data.emergencyContact is string && data.emergencyContact.size() >= 6 && data.emergencyContact.size() <= 40 &&
+             data.address is string && data.address.size() >= 3 && data.address.size() <= 250 &&
+             (!('boardingPoint' in data) || data.boardingPoint == null || (data.boardingPoint is string && data.boardingPoint.size() <= 160)) &&
+             data.selectedSeats is list && data.selectedSeats.size() >= 1 && data.selectedSeats.size() <= 20 && data.selectedSeats[0] is string &&
+             data.totalAmount is int && data.totalAmount >= 0 && data.totalAmount <= 5000000 &&
+             data.paidAmount is int && data.paidAmount >= 0 && data.paidAmount <= 5000000 &&
+             data.paymentMethod in ['বিকাশ', 'নগদ', 'রকেট', 'উপায়'] &&
+             data.transactionId is string && data.transactionId.size() >= 3 && data.transactionId.size() <= 80 &&
+             data.paymentDate is string && data.paymentDate.size() >= 1 && data.paymentDate.size() <= 40 &&
+             (!('paymentScreenshotUri' in data) || data.paymentScreenshotUri == null || (data.paymentScreenshotUri is string && data.paymentScreenshotUri.size() <= 500)) &&
+             (!('specialInstructions' in data) || data.specialInstructions == null || (data.specialInstructions is string && data.specialInstructions.size() <= 500)) &&
+             data.status in ['Pending', 'Payment Verification Pending', 'Confirmed', 'Cancelled', 'Completed'] &&
+             (!('confirmationMemoSent' in data) || data.confirmationMemoSent is bool) &&
+             (!('memoSentAt' in data) || data.memoSentAt == null || (data.memoSentAt is string && data.memoSentAt.size() <= 60)) &&
+             (!('assignedAdminId' in data) || data.assignedAdminId == null || (data.assignedAdminId is string && data.assignedAdminId.size() <= 64)) &&
+             (!('verifiedBy' in data) || data.verifiedBy == null || (data.verifiedBy is string && data.verifiedBy.size() <= 80)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidBookingLookup(data) {
+      return data.referenceNumber is string && data.referenceNumber.size() >= 6 && data.referenceNumber.size() <= 40 &&
+             data.bookingId is string && isValidId(data.bookingId) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.eventName is string && data.eventName.size() >= 1 && data.eventName.size() <= 140 &&
+             data.destination is string && data.destination.size() >= 1 && data.destination.size() <= 100 &&
+             data.tourDate is string && data.tourDate.size() >= 1 && data.tourDate.size() <= 60 &&
+             data.seatCount is int && data.seatCount >= 1 && data.seatCount <= 20 &&
+             data.seatLabels is string && data.seatLabels.size() >= 1 && data.seatLabels.size() <= 120 &&
+             data.status in ['Pending', 'Payment Verification Pending', 'Confirmed', 'Cancelled', 'Completed'] &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSettings(data) {
+      return data.organizationName is string && data.organizationName.size() >= 1 && data.organizationName.size() <= 120 &&
+             data.tagline is string && data.tagline.size() >= 1 && data.tagline.size() <= 160 &&
+             data.address is string && data.address.size() >= 1 && data.address.size() <= 200 &&
+             data.contactPhone is string && data.contactPhone.size() >= 6 && data.contactPhone.size() <= 30 &&
+             data.bookingPhone is string && data.bookingPhone.size() >= 6 && data.bookingPhone.size() <= 30 &&
+             data.advancePaymentNumber is string && data.advancePaymentNumber.size() >= 6 && data.advancePaymentNumber.size() <= 30 &&
+             (!('facebookUrl' in data) || data.facebookUrl == null || (data.facebookUrl is string && data.facebookUrl.size() <= 300)) &&
+             (!('whatsappUrl' in data) || data.whatsappUrl == null || (data.whatsappUrl is string && data.whatsappUrl.size() <= 300)) &&
+             (!('websiteUrl' in data) || data.websiteUrl == null || (data.websiteUrl is string && data.websiteUrl.size() <= 300)) &&
+             (!('welcomeBannerText' in data) || data.welcomeBannerText == null || (data.welcomeBannerText is string && data.welcomeBannerText.size() <= 300)) &&
+             (!('activeMonthTitle' in data) || data.activeMonthTitle == null || (data.activeMonthTitle is string && data.activeMonthTitle.size() <= 80)) &&
+             data.bookingCounter is int && data.bookingCounter >= 0 && data.bookingCounter <= 10000000 &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidReview(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.reviewerName is string && data.reviewerName.size() >= 2 && data.reviewerName.size() <= 80 &&
+             (!('eventId' in data) || data.eventId == null || isValidId(data.eventId)) &&
+             data.eventName is string && data.eventName.size() >= 1 && data.eventName.size() <= 140 &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.comment is string && data.comment.size() >= 2 && data.comment.size() <= 600 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 1. Events Catalog & Seat Plans (Only Admins can change monthly schedule; Viewers can read & book)
+    match /events/{eventId} {
+      allow get: if isSignedIn() && isValidId(eventId);
+      allow list: if isSignedIn();
+
+      allow create: if canAdminManageEvents() &&
+                       isValidId(eventId) &&
+                       incoming().keys().hasAll(['name', 'destination', 'tourDate', 'monthTag', 'category', 'duration', 'price', 'advancePayment', 'shortDescription', 'description', 'imageKey', 'galleryKeys', 'totalSeats', 'bookedSeats', 'holdSeats', 'vehicleLayout', 'bookingStatus', 'featured', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'destination', 'tourDate', 'monthTag', 'category', 'duration', 'price', 'advancePayment', 'shortDescription', 'description', 'imageKey', 'customImageUri', 'galleryKeys', 'totalSeats', 'bookedSeats', 'holdSeats', 'vehicleLayout', 'bookingStatus', 'featured', 'createdAt', 'updatedAt']) &&
+                       isValidEvent(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(eventId) &&
+                       isValidEvent(incoming()) &&
+                       incoming().createdAt == existing().createdAt && (
+                         canAdminManageEvents() ||
+                         (
+                           existing().bookingStatus in ['OPEN', 'ALMOST_FULL'] &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['holdSeats', 'updatedAt']) &&
+                           incoming().holdSeats.size() > existing().holdSeats.size() &&
+                           incoming().holdSeats.hasAll(existing().holdSeats) &&
+                           !incoming().holdSeats.hasAny(existing().bookedSeats) &&
+                           (incoming().holdSeats.size() + existing().bookedSeats.size()) <= existing().totalSeats
+                         )
+                       );
+
+      allow delete: if canAdminManageEvents() && isValidId(eventId);
+    }
+
+    // 2. Destinations Catalog
+    match /destinations/{destId} {
+      allow get: if isSignedIn() && isValidId(destId);
+      allow list: if isSignedIn();
+
+      allow create: if isAdmin() &&
+                       isValidId(destId) &&
+                       incoming().keys().hasAll(['name', 'division', 'shortDescription', 'fullDetails', 'bestTime', 'imageKey', 'relatedEventIds', 'sortOrder', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'division', 'shortDescription', 'fullDetails', 'bestTime', 'imageKey', 'relatedEventIds', 'sortOrder', 'createdAt', 'updatedAt']) &&
+                       isValidDestination(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(destId) &&
+                       isValidDestination(incoming()) &&
+                       incoming().createdAt == existing().createdAt;
+
+      allow delete: if isAdmin() && isValidId(destId);
+    }
+
+    // 3. Public Team Showcase (08 Official Admins - only Super Admin-approved public info)
+    match /team_members/{memberId} {
+      allow get: if isSignedIn() && isValidId(memberId);
+      allow list: if isSignedIn();
+
+      allow create: if isAdmin() &&
+                       isValidId(memberId) &&
+                       incoming().keys().hasAll(['name', 'designation', 'sortOrder', 'showPublicContact', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'designation', 'sortOrder', 'showPublicContact', 'publicPhone', 'whatsappUrl', 'facebookUrl', 'updatedAt']) &&
+                       isValidTeamMember(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(memberId) &&
+                       isValidTeamMember(incoming());
+
+      allow delete: if isSuperAdmin() && isValidId(memberId);
+    }
+
+    // 4. Trusted Admin UID Role Mappings
+    match /admins/{uid} {
+      allow get: if isSignedIn() && isValidId(uid) && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isSuperAdmin() &&
+                       isValidId(uid) &&
+                       incoming().uid == uid &&
+                       incoming().keys().hasAll(['uid', 'email', 'adminAccountId', 'role', 'displayName', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['uid', 'email', 'adminAccountId', 'role', 'displayName', 'canManageEvents', 'createdAt', 'updatedAt']) &&
+                       isValidAdminRole(incoming());
+
+      allow update: if isSuperAdmin() &&
+                       isValidId(uid) &&
+                       incoming().uid == existing().uid &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidAdminRole(incoming());
+
+      allow delete: if isSuperAdmin() && isValidId(uid);
+    }
+
+    // 5. Individual Admin Accounts (Private RBAC & PBKDF2 Hashes - Admin Only)
+    match /admin_accounts/{accountId} {
+      allow get: if isAdmin() && isValidId(accountId);
+      allow list: if isAdmin();
+
+      allow create: if isSuperAdmin() &&
+                       isValidId(accountId) &&
+                       incoming().keys().hasAll(['name', 'username', 'designation', 'role', 'passwordHash', 'passwordSalt', 'canManageEvents', 'canVerifyPayments', 'canManageBookings', 'canManageDestinations', 'canManageSettings', 'active', 'sortOrder', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'username', 'designation', 'role', 'passwordHash', 'passwordSalt', 'boundEmail', 'phone', 'whatsappUrl', 'facebookUrl', 'canManageEvents', 'canVerifyPayments', 'canManageBookings', 'canManageDestinations', 'canManageSettings', 'active', 'sortOrder', 'createdAt', 'updatedAt']) &&
+                       isValidAdminAccount(incoming());
+
+      allow update: if isSuperAdmin() &&
+                       isValidId(accountId) &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidAdminAccount(incoming());
+
+      allow delete: if isSuperAdmin() && isValidId(accountId);
+    }
+
+    // 6. Bookings (PII Isolated to Owner & Admins)
+    match /bookings/{bookingId} {
+      allow get: if isSignedIn() && isValidId(bookingId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(bookingId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'Payment Verification Pending' &&
+                       incoming().keys().hasAll(['userId', 'referenceNumber', 'eventId', 'eventName', 'destination', 'tourDate', 'touristName', 'touristEmail', 'mobileNumber', 'whatsappNumber', 'numberOfTourists', 'emergencyContact', 'address', 'selectedSeats', 'totalAmount', 'paidAmount', 'paymentMethod', 'transactionId', 'paymentDate', 'status', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'referenceNumber', 'eventId', 'eventName', 'destination', 'tourDate', 'touristName', 'touristEmail', 'mobileNumber', 'whatsappNumber', 'numberOfTourists', 'nidOrPassport', 'emergencyContact', 'address', 'boardingPoint', 'selectedSeats', 'totalAmount', 'paidAmount', 'paymentMethod', 'transactionId', 'paymentDate', 'paymentScreenshotUri', 'specialInstructions', 'status', 'confirmationMemoSent', 'memoSentAt', 'assignedAdminId', 'verifiedBy', 'createdAt', 'updatedAt']) &&
+                       isValidBooking(incoming()) &&
+                       exists(/databases/$(database)/documents/events/$(incoming().eventId));
+
+      allow update: if isSignedIn() &&
+                       isValidId(bookingId) &&
+                       isValidBooking(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().referenceNumber == existing().referenceNumber &&
+                       incoming().eventId == existing().eventId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assignedAdminId', 'verifiedBy', 'specialInstructions', 'confirmationMemoSent', 'memoSentAt', 'updatedAt'])) ||
+                         (existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['confirmationMemoSent', 'memoSentAt', 'updatedAt']))
+                       );
+
+      allow delete: if isAdmin() && isValidId(bookingId);
+    }
+
+    // 7. Non-PII Booking Reference Status Lookup (Get by exact Reference ID only; no list)
+    match /booking_status_lookup/{referenceNumber} {
+      allow get: if isSignedIn() && isValidId(referenceNumber);
+      allow list: if false;
+
+      allow create: if isSignedIn() &&
+                       isValidId(referenceNumber) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().referenceNumber == referenceNumber &&
+                       incoming().status == 'Payment Verification Pending' &&
+                       incoming().keys().hasAll(['referenceNumber', 'bookingId', 'userId', 'eventName', 'destination', 'tourDate', 'seatCount', 'seatLabels', 'status', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['referenceNumber', 'bookingId', 'userId', 'eventName', 'destination', 'tourDate', 'seatCount', 'seatLabels', 'status', 'updatedAt']) &&
+                       isValidBookingLookup(incoming());
+
+      allow update: if isAdmin() &&
+                       isValidId(referenceNumber) &&
+                       incoming().userId == existing().userId &&
+                       incoming().referenceNumber == existing().referenceNumber &&
+                       incoming().bookingId == existing().bookingId &&
+                       isValidBookingLookup(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if isAdmin() && isValidId(referenceNumber);
+    }
+
+    // 8. Agency Settings & Sequential Reference Counter
+    match /settings/{settingId} {
+      allow get: if isSignedIn() && settingId == 'agency';
+      allow list: if false;
+
+      allow create: if isAdmin() &&
+                       settingId == 'agency' &&
+                       incoming().keys().hasAll(['organizationName', 'tagline', 'address', 'contactPhone', 'bookingPhone', 'advancePaymentNumber', 'bookingCounter', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['organizationName', 'tagline', 'address', 'contactPhone', 'bookingPhone', 'advancePaymentNumber', 'facebookUrl', 'whatsappUrl', 'websiteUrl', 'welcomeBannerText', 'activeMonthTitle', 'bookingCounter', 'updatedAt']) &&
+                       isValidSettings(incoming());
+
+      allow update: if isSignedIn() &&
+                       settingId == 'agency' &&
+                       isValidSettings(incoming()) && (
+                         isAdmin() ||
+                         (
+                           incoming().diff(existing()).affectedKeys().hasOnly(['bookingCounter', 'updatedAt']) &&
+                           incoming().bookingCounter == existing().bookingCounter + 1
+                         )
+                       );
+
+      allow delete: if false;
+    }
+
+    // 9. Tour Reviews & Star Ratings
+    match /reviews/{reviewId} {
+      allow get: if isSignedIn() && isValidId(reviewId);
+      allow list: if isSignedIn();
+
+      allow create: if isSignedIn() &&
+                       isValidId(reviewId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'reviewerName', 'eventName', 'rating', 'comment', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'reviewerName', 'eventId', 'eventName', 'rating', 'comment', 'createdAt', 'updatedAt']) &&
+                       isValidReview(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(reviewId) &&
+                       existing().userId == request.auth.uid &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().keys().hasAll(['userId', 'reviewerName', 'eventName', 'rating', 'comment', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'reviewerName', 'eventId', 'eventName', 'rating', 'comment', 'createdAt', 'updatedAt']) &&
+                       isValidReview(incoming());
+
+      allow delete: if isSignedIn() &&
+                       isValidId(reviewId) &&
+                       (existing().userId == request.auth.uid || isAdmin());
+    }
+  }
+}
